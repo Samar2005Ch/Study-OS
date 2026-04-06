@@ -86,7 +86,7 @@ router.get("/today", (req, res) => {
 });
 
 router.put("/:id/status", (req, res) => {
-  const { status, actualMins, ghostCount, locked, topicProgress } = req.body;
+  const { status, actualMins, ghostCount, locked, topicProgress, integrityScore, completionPct, xpEarned } = req.body;
 
   if (status === "active") {
     const task = db.prepare("SELECT * FROM scheduled_tasks WHERE id=? AND user_id=?").get(req.params.id, req.userId);
@@ -142,8 +142,16 @@ router.put("/:id/status", (req, res) => {
     }
   }
 
-  db.prepare("UPDATE scheduled_tasks SET status=?,actual_mins=?,ghost_count=?,locked=? WHERE id=? AND user_id=?")
-    .run(status, actualMins||0, ghostCount||0, locked?1:0, req.params.id, req.userId);
+  db.prepare(`
+    UPDATE scheduled_tasks 
+    SET status=?, actual_mins=?, ghost_count=?, locked=?, 
+        integrity_score=?, completion_pct=?, xp_earned=?
+    WHERE id=? AND user_id=?
+  `).run(
+    status, actualMins||0, ghostCount||0, locked?1:0, 
+    integrityScore||100, completionPct||0, xpEarned||0,
+    req.params.id, req.userId
+  );
 
   let systemMessage = null;
 

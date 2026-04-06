@@ -98,6 +98,11 @@ db.exec(`
     ghosted      INTEGER NOT NULL DEFAULT 0,
     time_of_day  TEXT    NOT NULL DEFAULT 'morning',
     xp_earned    INTEGER NOT NULL DEFAULT 0,
+    integrity_score INTEGER NOT NULL DEFAULT 100,
+    completion_pct  INTEGER NOT NULL DEFAULT 0,
+    tab_hide_count  INTEGER NOT NULL DEFAULT 0,
+    inactivity_count INTEGER NOT NULL DEFAULT 0,
+    pause_count      INTEGER NOT NULL DEFAULT 0,
     schedule_date TEXT   NOT NULL DEFAULT '',
     created_at   TEXT    DEFAULT CURRENT_TIMESTAMP
   );
@@ -127,6 +132,9 @@ db.exec(`
     actual_mins      INTEGER NOT NULL DEFAULT 0,
     ghost_count      INTEGER NOT NULL DEFAULT 0,
     locked           INTEGER NOT NULL DEFAULT 0,
+    integrity_score  INTEGER NOT NULL DEFAULT 100,
+    completion_pct   INTEGER NOT NULL DEFAULT 0,
+    xp_earned        INTEGER NOT NULL DEFAULT 0,
     schedule_date    TEXT    NOT NULL DEFAULT ''
   );
 

@@ -60,14 +60,21 @@ export function calcAnalytics(history, subjects) {
   const bestTimeSlot  = [...byTime].sort((a,b)=>b.done -a.done)[0];
   const worstTimeSlot = [...byTime].sort((a,b)=>b.ghost-a.ghost)[0];
 
-  // Streak
+  const getLocalStr = (d) => {
+    const y = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${y}-${mm}-${dd}`;
+  };
+
   const doneDates = [...new Set(
-    history.filter(h=>isTrue(h.completed)).map(h=>h.date)
+    history.filter(h => isTrue(h.completed)).map(h => fld(h, "schedule_date", "scheduleDate"))
   )].sort().reverse();
+  
   let streak = 0;
-  for (let i=0;i<doneDates.length;i++){
-    const d=new Date(); d.setDate(d.getDate()-i);
-    if(doneDates[i]===d.toISOString().split("T")[0]) streak++;
+  for (let i = 0; i < doneDates.length; i++) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    if (doneDates[i] === getLocalStr(d)) streak++;
     else break;
   }
 
@@ -75,17 +82,17 @@ export function calcAnalytics(history, subjects) {
   const weekly = [];
   for (let i=6;i>=0;i--){
     const d=new Date(); d.setDate(d.getDate()-i);
-    const ds=d.toISOString().split("T")[0];
-    const dh=history.filter(h=>h.date===ds);
+    const ds = getLocalStr(d);
+    const dh = history.filter(h => fld(h, "schedule_date", "scheduleDate") === ds);
     weekly.push({
-      date:ds,
-      label:d.toLocaleDateString("en-IN",{weekday:"short"}),
-      done: dh.filter(h=>isTrue(h.completed)).length,
-      ghost:dh.filter(h=>isTrue(h.ghosted)).length,
-      mins: dh.filter(h=>isTrue(h.completed))
-              .reduce((a,h)=>a+(fld(h,"actual_mins","actualMins")||fld(h,"planned_mins","plannedMins")||0),0),
-      xp:  dh.reduce((a,h)=>a+(fld(h,"xp_earned","xpEarned")||0),0),
-      isToday:i===0,
+      date: ds,
+      label: d.toLocaleDateString("en-US", { weekday: "short" }),
+      done: dh.filter(h => isTrue(h.completed)).length,
+      ghost: dh.filter(h => isTrue(h.ghosted)).length,
+      mins: dh.filter(h => isTrue(h.completed))
+              .reduce((a, h) => a + (fld(h, "actual_mins", "actualMins") || fld(h, "planned_mins", "plannedMins") || 0), 0),
+      xp: dh.reduce((a, h) => a + (fld(h, "xp_earned", "xpEarned") || 0), 0),
+      isToday: i === 0,
     });
   }
 

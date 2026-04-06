@@ -8,10 +8,18 @@ import { api } from "../api/client";
 export const hourLabel = (h) =>
   h<6?"night":h<12?"morning":h<17?"afternoon":h<21?"evening":"night";
 
-export function calcXP(topicProgress, plannedMins) {
+/**
+ * calcXP — backward-compatible wrapper.
+ * Prefer importing calcXP from utils/xpEngine for full integrity scoring.
+ * This simplified version is kept for legacy callers.
+ */
+export function calcXP(topicProgress, plannedMins, integrityScore) {
   if (typeof topicProgress !== "number") topicProgress = 100;
-  return Math.round((topicProgress / 100) * plannedMins);
+  const integMult = integrityScore !== undefined ? (integrityScore / 100) : 1;
+  return Math.round((topicProgress / 100) * plannedMins * integMult * 4);
 }
+
+export { calcXP as calcXPLegacy };
 
 const SchedulerContext = createContext();
 

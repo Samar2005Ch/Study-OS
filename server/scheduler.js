@@ -325,6 +325,15 @@ function buildSchedule({
   
   if (startFrom >= sleepMins) return [];
 
+  // ── SEED USED TOPICS FROM HISTORY ───────────────────────
+  // Ensure topics completed/ghosted today are not picked again
+  const usedTopics = {}; 
+  const today = new Date().toISOString().split("T")[0];
+  history.filter(h => h.schedule_date === today || h.date === today).forEach(h => {
+    if (!usedTopics[h.source_id]) usedTopics[h.source_id] = new Set();
+    usedTopics[h.source_id].add(h.topic);
+  });
+
   // Find free slots in today's timetable
   const busyToday = timetableSlots
     .filter(s => s.day === todayStr())
@@ -367,9 +376,32 @@ function buildSchedule({
     return { ...s, _meta:meta, _light:isLight(s) };
   }).sort((a,b) => b._meta.score - a._meta.score);
 
+  // ── DE-DUPLICATE OVERLAPPING TOPICS ─────────────────────
+  // If multiple exams have the same subject/topic, we only need to study it once.
+  const seenTopics = new Set();
+  const dedupedScored = [];
+  for (const s of scored) {
+    const uniqueTopics = (s.topics || []).filter(t => {
+      const key = `${s.name.toLowerCase()}|${t.name.toLowerCase()}`;
+      if (seenTopics.has(key)) {
+        // Topic already covered by another exam subject.
+        // We can give a "Synergy Bonus" to the first occurrence if we want,
+        // but for now we just filter out duplicates to avoid redundant scheduling.
+        return false;
+      }
+      seenTopics.add(key);
+      return true;
+    });
+    // Add "Synergy Bonus" if this subject shares topics with others
+    if (uniqueTopics.length < (s.topics?.length || 0)) {
+      s._meta.score *= 1.25; // 25% priority boost for high-impact overlapping subjects
+    }
+    dedupedScored.push({ ...s, topics: uniqueTopics });
+  }
+
   // Separate hard and light for recovery pattern
-  const hardSubs  = scored.filter(s => !s._light);
-  const lightSubs = scored.filter(s =>  s._light);
+  const hardSubs  = dedupedScored.filter(s => !s._light);
+  const lightSubs = dedupedScored.filter(s =>  s._light);
 
   // Add skills at the very end (leftover time only)
   const skillItems = skills.map(s => ({
@@ -398,7 +430,7 @@ function buildSchedule({
 
   // SCHEDULE
   const tasks       = [];
-  const usedTopics  = {}; // subjectId → Set of topic names used today
+  // usedTopics seeded above from history
   let totalScheduled = 0;
   let lastWasHard   = false;
 

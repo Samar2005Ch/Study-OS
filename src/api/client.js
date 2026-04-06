@@ -45,9 +45,28 @@ export const api = {
   generateSchedule:() => request("POST",   "/schedule/generate"),
   getTodayTasks:   () => request("GET",    "/schedule/today"),
   updateTaskStatus:(id,d)  => request("PUT",    `/schedule/${id}/status`, d),
+  insertTask:      d  => request("POST",   "/schedule/insert", d),
 
   getHistory:      () => request("GET",    "/history"),
   addHistory:      d  => request("POST",   "/history", d),
+  recordSession:   d  => request("POST",   "/history", d), // alias with full session data
+
+  // Subjects (extracted from exams for intelligence engine)
+  getSubjects:     () => request("GET",    "/exams").then(exams => {
+    const subjects = [];
+    (exams || []).forEach(exam => {
+      (exam.subjects || []).forEach(s => {
+        subjects.push({
+          ...s,
+          examId:    exam.id,
+          examName:  exam.name,
+          examDate:  exam.date,
+          subjectIds: [s.id],
+        });
+      });
+    });
+    return subjects;
+  }),
 
   getSettings:     () => request("GET",    "/settings"),
   saveSetting:     (k,v) => request("POST",   "/settings", { key:k, value:v }),

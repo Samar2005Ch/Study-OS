@@ -4,8 +4,15 @@ import { api } from "../../api/client";
 
 export default function AuthPage() {
   const { login } = useAuth();
-  const [tab, setTab] = useState("login");
-  const [name, setName] = useState(""); const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [otp, setOtp] = useState(""); const [pendingEmail, setPendingEmail] = useState("");
+  const [tab, setTab] = useState(() => {
+    const saved = sessionStorage.getItem("studyos_auth_tab");
+    return saved || "login";
+  });
+  const [name, setName] = useState(""); 
+  const [email, setEmail] = useState(""); 
+  const [password, setPassword] = useState(""); 
+  const [otp, setOtp] = useState(""); 
+  const [pendingEmail, setPendingEmail] = useState(() => sessionStorage.getItem("studyos_pending_email") || "");
   const [error, setError] = useState(""); const [info, setInfo] = useState(""); const [loading, setLoading] = useState(false);
   const isOtp = tab === "otp";
 
@@ -17,13 +24,26 @@ export default function AuthPage() {
     if (!emailRegex.test(email)) { setError("Enter a valid email."); return; }
     if (password.length < 6) { setError("Password must be 6+ characters."); return; }
     setLoading(true);
-    try { const res = await api.signup({name,email,password}); setPendingEmail(email.toLowerCase()); setInfo(res.message); setTab("otp"); }
+    try { 
+      const res = await api.signup({name,email,password}); 
+      const pEmail = email.toLowerCase();
+      setPendingEmail(pEmail); 
+      sessionStorage.setItem("studyos_pending_email", pEmail);
+      sessionStorage.setItem("studyos_auth_tab", "otp");
+      setInfo(res.message); 
+      setTab("otp"); 
+    }
     catch(e) { setError(e.message); } finally { setLoading(false); }
   }
 
   async function handleVerifyOtp() {
     setError(""); setLoading(true);
-    try { const res = await api.verifyOtp({email:pendingEmail,otp}); login(res.token,res.user); }
+    try { 
+      const res = await api.verifyOtp({email:pendingEmail,otp}); 
+      sessionStorage.removeItem("studyos_pending_email");
+      sessionStorage.removeItem("studyos_auth_tab");
+      login(res.token,res.user); 
+    }
     catch(e) { setError(e.message); } finally { setLoading(false); }
   }
 

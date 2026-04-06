@@ -4,132 +4,13 @@ import { usePath } from "../../system/PathContext";
 import { useRank } from "../../system/RankContext";
 import { showToast } from "../../components/Toast";
 import { fireScouter } from "../../components/Scouter";
-
-function fmtSecs(s) {
-  return `${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
-}
-
-const STUDY_MODES = [
-  { id:"laptop",   icon:"💻", label:"On Laptop",    checkMins:15 },
-  { id:"lecture",  icon:"📺", label:"Video Lecture",checkMins:30 },
-  { id:"book",     icon:"📖", label:"From Book",    checkMins:30 },
-  { id:"phone",    icon:"📱", label:"Phone Lecture",checkMins:30 },
-  { id:"practice", icon:"✏️", label:"Practising",   checkMins:15 },
-  { id:"revision", icon:"⚡", label:"Revision",     checkMins:15 },
-];
-
-function PomodoroTimer({ task, onDone, onSkip, onGhost, pathColor }) {
-  const totalSecs = (task.duration_mins||25)*60;
-  const [secs,     setSecs]     = useState(totalSecs);
-  const [running,  setRunning]  = useState(false);
-  const [mode,     setMode]     = useState("laptop");
-  const [canDone,  setCanDone]  = useState(false);
-  const [ghostCnt, setGhostCnt] = useState(0);
-  const startedAt = useRef(null);
-  const c = pathColor;
-
-  useEffect(() => {
-    if (!running) return;
-    const iv = setInterval(() => setSecs(s => {
-      if (s<=1) { clearInterval(iv); handleDone(); return 0; }
-      return s-1;
-    }), 1000);
-    // Enable Done after 5 min
-    setTimeout(() => setCanDone(true), 5*60*1000);
-    return () => clearInterval(iv);
-  }, [running]);
-
-  // Update tab title
-  useEffect(() => {
-    if (running) {
-      const modeInfo = STUDY_MODES.find(m=>m.id===mode);
-      document.title = `${modeInfo?.icon||"⏱"} ${fmtSecs(secs)} · ${task.subject_name}`;
-    } else {
-      document.title = "StudyOS";
-    }
-    return () => { document.title = "StudyOS"; };
-  }, [running, secs, mode, task]);
-
-  function handleStart() { setRunning(true); startedAt.current = Date.now(); }
-
-  function handleDone() {
-    setRunning(false);
-    const actualMins = startedAt.current ? Math.floor((Date.now()-startedAt.current)/60000) : task.duration_mins;
-    onDone(task.id, actualMins, ghostCnt);
-  }
-
-  const pct = ((totalSecs-secs)/totalSecs)*100;
-  const r=64, circ=Math.PI*2*r;
-
-  return (
-    <div style={{position:"fixed",inset:0,zIndex:500,background:"rgba(6,6,8,.95)",backdropFilter:"blur(20px)",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:24}}>
-
-      {/* Subject info */}
-      <div style={{textAlign:"center"}}>
-        <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:9,color:c,letterSpacing:".2em",marginBottom:8}}>[ SESSION ACTIVE ]</div>
-        <h2 style={{fontSize:22,fontWeight:900,marginBottom:4}}>{task.subject_name}</h2>
-        <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:"var(--t3)"}}>{task.topic}</div>
-      </div>
-
-      {/* Ring timer */}
-      <div style={{position:"relative",width:160,height:160}}>
-        <svg width={160} height={160} style={{transform:"rotate(-90deg)"}}>
-          <circle cx={80} cy={80} r={r} fill="none" stroke="rgba(255,255,255,.04)" strokeWidth={6}/>
-          <circle cx={80} cy={80} r={r} fill="none" stroke={c} strokeWidth={6}
-            strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={circ*(1-pct/100)}
-            style={{transition:"stroke-dashoffset .9s linear",filter:`drop-shadow(0 0 8px ${c}80)`}}/>
-        </svg>
-        <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column"}}>
-          <div style={{fontSize:36,fontWeight:900,letterSpacing:"-2px",fontVariantNumeric:"tabular-nums"}}>{fmtSecs(secs)}</div>
-          <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:8,color:"var(--t3)",marginTop:4,letterSpacing:".1em"}}>{task.duration_mins}MIN SESSION</div>
-        </div>
-      </div>
-
-      {/* Study mode */}
-      <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"center",maxWidth:400}}>
-        {STUDY_MODES.map(m=>(
-          <button key={m.id} onClick={()=>setMode(m.id)} style={{
-            padding:"5px 10px",borderRadius:8,cursor:"pointer",
-            border:`1px solid ${mode===m.id?c+"50":"var(--b1)"}`,
-            background:mode===m.id?`${c}15`:"transparent",
-            color:mode===m.id?c:"var(--t3)",fontSize:11,
-            display:"flex",alignItems:"center",gap:5,
-            fontFamily:"'JetBrains Mono',monospace",transition:"all .15s",
-          }}>
-            <span style={{fontSize:13}}>{m.icon}</span>{m.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Buttons */}
-      <div style={{display:"flex",gap:10}}>
-        {!running ? (
-          <button className="btn btn-p" onClick={handleStart} style={{padding:"0 32px",fontSize:15}}>
-            ▸ ARISE
-          </button>
-        ) : (
-          <>
-            <button onClick={()=>onSkip(task.id)} style={{padding:"0 18px",height:40,background:"transparent",border:"1px solid var(--b1)",borderRadius:10,color:"var(--t3)",cursor:"pointer",fontFamily:"'JetBrains Mono',monospace",fontSize:11}}>LATER</button>
-            <button disabled={!canDone} onClick={handleDone} style={{
-              padding:"0 24px",height:40,background:canDone?`${c}18`:"var(--s2)",border:`1px solid ${canDone?c:"var(--b1)"}`,
-              borderRadius:10,color:canDone?c:"var(--t4)",cursor:canDone?"pointer":"not-allowed",fontFamily:"'JetBrains Mono',monospace",fontSize:11,fontWeight:700,
-            }}>DONE</button>
-            <button onClick={()=>onSkip(task.id)} style={{padding:"0 18px",height:40,background:"transparent",border:"1px solid rgba(240,96,96,.2)",borderRadius:10,color:"var(--red)",cursor:"pointer",fontFamily:"'JetBrains Mono',monospace",fontSize:11}}>SKIP</button>
-          </>
-        )}
-      </div>
-
-      {/* Close */}
-      <button onClick={()=>onSkip(null)} style={{background:"none",border:"none",color:"var(--t4)",cursor:"pointer",fontFamily:"'JetBrains Mono',monospace",fontSize:11,letterSpacing:".08em",marginTop:-12}}>
-        CLOSE
-      </button>
-    </div>
-  );
-}
+import PomodoroTimer from "./PomodoroTimer"; 
+import Portal from "../../components/Portal";
 
 export default function SchedulePage() {
   const { path } = usePath();
-  const { addXP } = useRank();
+  const { addXP, rank, totalXP } = useRank(); // Use rank for streak
+  const [showManual, setShowManual] = useState(false);
   const c = path.primary;
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -151,26 +32,74 @@ export default function SchedulePage() {
     setGenerating(false);
   }
 
+  async function handleManualInsert(data) {
+    setGenerating(true);
+    try {
+      const now = new Date();
+      const atTime = `${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
+      await api.insertTask({ ...data, atTime });
+      const t = await api.getTodayTasks();
+      setTasks(t);
+      setShowManual(false);
+      showToast("Raid Inserted", "Schedule updated.", path.sig);
+    } catch (e) { showToast("Error", e.message); }
+    setGenerating(false);
+  }
+
   async function startTask(id) {
     await api.updateTaskStatus(id, { status:"active" });
     setTasks(p=>p.map(t=>t.id===id?{...t,status:"active"}:t));
     setActiveTask(tasks.find(t=>t.id===id));
   }
 
-  async function completeTask(id, actualMins, ghostCount) {
-    const task = tasks.find(t=>t.id===id);
-    const xp = task ? Math.round((task.difficulty_num||2)*actualMins*0.5) : 0;
-    await api.updateTaskStatus(id, { status:"completed", actualMins, ghostCount });
-    await api.addHistory({
-      sourceType:"exam", sourceId:task?.source_id||0,
-      topic:task?.topic||"", plannedMins:task?.duration_mins||0,
-      actualMins, completed:1, skipped:0, ghosted:0,
-      xpEarned:xp, scheduleDate:new Date().toISOString().split("T")[0],
+  /**
+   * @param {number} focusedMins — honest focus time
+   * @param {number} progress — 0-100 completion %
+   * @param {number} xp — calculated in timer via xpEngine
+   * @param {number} integrity — 0-100 integrity score
+   * @param {Object} signals — raw anti-cheat signals for history
+   */
+  async function completeTask(focusedMins, progress, xp, integrity, signals = {}) {
+    if (!activeTask) return;
+    const id = activeTask.id;
+    
+    // 1. Update task status in DB
+    await api.updateTaskStatus(id, { 
+      status: "completed", 
+      actualMins: focusedMins,
+      completionPct: progress,
+      integrityScore: integrity,
+      xpEarned: xp
     });
+
+    // 2. Record detailed history for intelligence engine
+    await api.recordSession({
+      sourceType:     "exam", 
+      sourceId:       activeTask.source_id || 0,
+      subjectId:      activeTask.subject_id || 0,
+      topic:          activeTask.topic || "",
+      plannedMins:    activeTask.duration_mins || 0,
+      actualMins:     focusedMins,
+      completed:      progress >= 90 ? 1 : 0,
+      completionPct:  progress,
+      integrityScore: integrity,
+      xpEarned:       xp,
+      date:           new Date().toISOString().split("T")[0],
+      timeOfDay:      new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening",
+      // Anti-cheat signals
+      tabHideCount:    signals.tabHideCount || 0,
+      inactivityCount: signals.inactivityCount || 0,
+      pauseCount:      signals.pauseCount || 0,
+    });
+
+    // 3. Update Rank and UI
     addXP(xp);
-    setTasks(p=>p.map(t=>t.id===id?{...t,status:"completed",actual_mins:actualMins}:t));
+    setTasks(p => p.map(t => t.id === id ? { ...t, status: "completed", actual_mins: focusedMins, xp_earned: xp } : t));
     setActiveTask(null);
-    showToast("Session complete", task?.subject_name||"", `+${xp} XP`);
+
+    // 4. Feedback
+    const msg = integrity < 50 ? "Session Flagged (Low Integrity)" : `Session complete: ${progress}%`;
+    showToast(msg, activeTask.subject_name, `+${xp} XP`);
   }
 
   async function skipTask(id) {
@@ -188,8 +117,17 @@ export default function SchedulePage() {
   return (
     <div className="page">
       {activeTask && (
-        <PomodoroTimer task={activeTask} pathColor={c}
-          onDone={completeTask} onSkip={skipTask} onGhost={()=>{}}/>
+        <PomodoroTimer 
+          task={activeTask} 
+          streak={rank.streak || 0}
+          onDone={completeTask} 
+          onSkip={skipTask} 
+          onPostpone={() => skipTask(activeTask.id)}
+          onGhostLogged={() => {
+             showToast("Ghost Session Logged", "Intelligence updated.", "⚠️");
+             setActiveTask(null);
+          }}
+        />
       )}
 
       <div className="page-hdr">
@@ -197,11 +135,22 @@ export default function SchedulePage() {
           <div className="page-tag">{path.name.toUpperCase()} · {(path.navSchedule||"SCHEDULE").toUpperCase()}</div>
           <h1 className="page-title">{path.navSchedule||"Schedule"}</h1>
         </div>
-        <button className="btn btn-p" onClick={generate} disabled={generating}>
-          {generating?<span className="spinner" style={{width:14,height:14}}/>:null}
-          Generate
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="btn btn-g" onClick={() => setShowManual(true)}>+ Manual Raid</button>
+          <button className="btn btn-p" onClick={generate} disabled={generating}>
+            {generating ? <span className="spinner" style={{ width: 14, height: 14 }} /> : null}
+            Generate
+          </button>
+        </div>
       </div>
+
+      {showManual && (
+        <ManualRaidModal 
+          onClose={() => setShowManual(false)} 
+          onSave={handleManualInsert}
+          color={c}
+        />
+      )}
 
       {/* Progress bar */}
       {total>0 && (
@@ -298,5 +247,46 @@ export default function SchedulePage() {
         </div>
       )}
     </div>
+  );
+}
+
+function ManualRaidModal({ onClose, onSave, color }) {
+  const [subject, setSubject] = useState("");
+  const [topic,   setTopic]   = useState("");
+  const [mins,    setMins]    = useState(60);
+
+  return (
+    <Portal>
+      <div className="modal-overlay" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(12px)", zIndex: 10000 }}>
+        <div className="card anim-up" style={{ width: 400, padding: 32, borderTop: `4px solid ${color}` }}>
+          <div style={{ fontSize: 9, color, fontFamily: "monospace", letterSpacing: ".15em", marginBottom: 8 }}>
+            SYSTEM MONARCH: MANUAL OVERRIDE
+          </div>
+          <h2 style={{ fontSize: 24, fontWeight: 900, marginBottom: 24 }}>Insert Manual Raid</h2>
+          
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            <div className="input-group">
+              <label>SUBJECT NAME</label>
+              <input style={{ background: "var(--s2)", border: "1px solid var(--b1)", color: "var(--t1)", padding: 12, borderRadius: 8 }} value={subject} onChange={e=>setSubject(e.target.value)} placeholder="e.g. Physics" />
+            </div>
+            <div className="input-group">
+              <label>TOPIC / OBJECTIVE</label>
+              <input style={{ background: "var(--s2)", border: "1px solid var(--b1)", color: "var(--t1)", padding: 12, borderRadius: 8 }} value={topic} onChange={e=>setTopic(e.target.value)} placeholder="e.g. Mechanics" />
+            </div>
+            <div className="input-group">
+              <label>DURATION (MINUTES)</label>
+              <input style={{ background: "var(--s2)", border: "1px solid var(--b1)", color: "var(--t1)", padding: 12, borderRadius: 8 }} type="number" value={mins} onChange={e=>setMins(parseInt(e.target.value))} />
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 12, marginTop: 32 }}>
+            <button className="btn btn-g" style={{ flex: 1 }} onClick={onClose}>ABORT</button>
+            <button className="btn btn-p" style={{ flex: 2 }} onClick={() => onSave({ subject_name:subject, topic, duration_mins:mins })}>
+              INITIALIZE RAID ▸
+            </button>
+          </div>
+        </div>
+      </div>
+    </Portal>
   );
 }
